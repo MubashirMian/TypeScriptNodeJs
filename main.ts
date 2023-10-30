@@ -1,150 +1,114 @@
-#! /usr/bin/env node
+import * as fs from 'fs';
+import inquirer  from 'inquirer';
 
-import { faker } from "@faker-js/faker";
-import chalk from "chalk";
-import inquirer from "inquirer";
+const todoFile = 'todo.json';
 
-interface IBankAccount {
-  accNumber: number;
-  balance: number;
+interface Task {
+  id: number;
+  task: string;
+  completed: boolean;
 }
 
-class Customer {
-  FirstName: string;
-  LastName: string;
-  Gender: string;
-  Age: number;
-  MobileNumber: number;
-  AccountNumber: number;
-
-  constructor(
-    f: string,
-    l: string,
-    g: string,
-    age: number,
-    contact: number,
-    acc: number
-  ) {
-    this.FirstName = f;
-    this.LastName = l;
-    this.Gender = g;
-    this.Age = age;
-    this.MobileNumber = contact;
-    this.AccountNumber = acc;
+// Function to load tasks from the JSON file
+function loadTasks(): Task[] {
+  try {
+    const data = fs.readFileSync(todoFile, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    return [];
   }
 }
 
-class Bank {
-  customer: Customer[] = [];
-  account: IBankAccount[] = [];
-  addcustomer(object: Customer) {
-    this.customer.push(object);
-  }
-  addaccount(object: IBankAccount) {
-    this.account.push(object);
-  }
-  transaction(object: IBankAccount) {
-    let newAccounts = this.account.filter((acc) => {
-      acc.accNumber !== object.accNumber;
+// Function to save tasks to the JSON file
+function saveTasks(tasks: Task[]) {
+  fs.writeFileSync(todoFile, JSON.stringify(tasks, null, 2), 'utf8');
+}
+
+// Function to display the current tasks
+function displayTasks() {
+  const tasks = loadTasks();
+
+  if (tasks.length === 0) {
+    console.log('No tasks in the to-do list.');
+  } else {
+    console.log('To-Do List:');
+    tasks.forEach((task, index) => {
+      console.log(`${index + 1}. [${task.completed ? 'X' : ' '}] ${task.task}`);
     });
-    this.account = [...newAccounts, object];
   }
 }
 
-let bank = new Bank();
-console.log(bank);
-for (let i = 1; i < 4; i++) {
-  let f = faker.person.firstName("male");
-  let l = faker.person.lastName();
-  let contact = parseInt(faker.phone.number("##########"));
-  const customer = new Customer(f, l, "male", 30 + 2 * i, contact, 1000 + i);
-  bank.addcustomer(customer);
-  bank.addaccount({ accNumber: customer.AccountNumber, balance: 50 * i + 1 });
+// Function to add a new task
+async function addTask() {
+  const { task } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'task',
+      message: 'Enter a new task:',
+    },
+  ]);
+
+  const tasks = loadTasks();
+  const newTask: Task = {
+    id: Date.now(),
+    task: task,
+    completed: false,
+  };
+  tasks.push(newTask);
+  saveTasks(tasks);
+  console.log('Task added to the to-do list.');
 }
 
-async function bankService(bank: Bank) {
-  let Continue: boolean = true;
-  do {
-    let service = await inquirer.prompt({
-      name: "choice",
-      type: "list",
-      message: "Kindly select a functionality",
-      choices: ["View Balance", "Cash Withdraw", "Cash Deposit", "Exit"],
-    });
-    if (service.choice === "View Balance") {
-      let response = await inquirer.prompt({
-        type: "input",
-        name: "answer",
-        message: "Kindly enter your account number",
-      });
-      let account = bank.account.find(
-        (acc) => acc.accNumber == response.answer
-      );
-      if (!account) {
-        console.log(chalk.redBright.bold("Invalid Account Number"));
-      } else {
-        let name = bank.customer.find((item) => {
-          item.AccountNumber == account?.accNumber;
-        });
-        console.log(
-          "Your account balance is ",
-          chalk.greenBright.italic("$", account.balance)
-        );
-      }
-    }
-    else if (service.choice === "Cash Withdraw") {
-      let response = await inquirer.prompt({
-        type: "input",
-        name: "answer",
-        message: "Kindly enter your account number",
-      });
-      let account = bank.account.find(
-        (acc) => acc.accNumber == response.answer
-      );
-      if (!account) {
-        console.log(chalk.redBright.bold("Invalid Account Number"));
-      } else {
-        let answers = await inquirer.prompt({
-          type: "input",
-          name: "answer",
-          message: "Enter your amount",
-        });
-        if (account.balance > answers.answer) {
-          let newBalance = account.balance - answers.answer;
-          bank.transaction({
-            accNumber: account.accNumber,
-            balance: newBalance,
-          });
-        } else {
-          console.log("Insufficient balance");
-        }
-      }
-    }
-    else if (service.choice === "Cash Deposit") {
-      let response = await inquirer.prompt({
-        type: "input",
-        name: "answer",
-        message: "Kindly enter your account number",
-      });
-      let account = bank.account.find(
-        (acc) => acc.accNumber == response.answer
-      );
-      if (!account) {
-        console.log(chalk.redBright.bold("Invalid Account Number"));
-      } else {
-        let answers = await inquirer.prompt({
-          type: "input",
-          name: "answer",
-          message: "Enter your amount",
-        });
-        let newBalance = account.balance + parseFloat(answers.answer);
-        bank.transaction({ accNumber: account.accNumber, balance: newBalance });
-      }
-    } else {
-      console.log("Program Exit successful");
-      break;
-    }
-  } while (Continue);
+// Function to remove a task
+async function removeTask() {
+  const tasks = loadTasks();
+
+  if (tasks.length === 0) {
+    console.log('No tasks to remove.');
+    return;
+  }
+
+  const { taskIndex } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'taskIndex',
+      message: 'Select a task to remove:',
+      choices: tasks.map((task, index) => `${index + 1}. ${task.task}`),
+    },
+  ]);
+
+  const indexToRemove = parseInt(taskIndex.split('.')[0]) - 1;
+  tasks.splice(indexToRemove, 1);
+  saveTasks(tasks);
+  console.log('Task removed from the to-do list.');
 }
 
-bankService(bank);
+async function main() {
+  while (true) {
+    const { action } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'action',
+        message: 'Choose an action:',
+        choices: ['Add a task', 'Remove a task', 'Show tasks', 'Exit'],
+      },
+    ]);
+
+    switch (action) {
+      case 'Add a task':
+        await addTask();
+        break;
+      case 'Remove a task':
+        await removeTask();
+        break;
+      case 'Show tasks':
+        displayTasks();
+        break;
+      case 'Exit':
+        process.exit();
+    }
+  }
+}
+
+main();
+
