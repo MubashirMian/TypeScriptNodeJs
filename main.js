@@ -1,67 +1,123 @@
-import inquirer from 'inquirer';
-import { add } from './add.js';
-import { sub } from './sub.js';
-import { multiply } from './multiply.js';
-import { divide } from './divide.js';
-async function LetsDoCal() {
-    const operations = ['+', '-', '*', '/'];
-    const AskChoice = [
-        {
-            type: 'list',
-            name: 'choice',
-            message: 'Choose the operation',
-            choices: operations,
-        },
-    ];
-    const Answer = await inquirer.prompt(AskChoice);
-    const Chosen = Answer.choice;
-    const LetInput = [
-        {
-            type: 'number',
-            name: 'numOne',
-            message: 'Enter the first number',
-        },
-        {
-            type: 'number',
-            name: 'numTwo',
-            message: 'Enter the second number',
-        },
-    ];
-    const NumbersAnswer = await inquirer.prompt(LetInput);
-    const NumOne = NumbersAnswer.numOne;
-    const NumTwo = NumbersAnswer.numTwo;
-    let result;
-    if (Chosen === operations[0]) {
-        result = add(NumOne, NumTwo);
-    }
-    else if (Chosen === operations[1]) {
-        result = sub(NumOne, NumTwo);
-    }
-    else if (Chosen === operations[2]) {
-        result = multiply(NumOne, NumTwo);
-    }
-    else {
-        result = divide(NumOne, NumTwo);
-    }
-    console.log(`Result: ${result}`);
-    ContineOrNo();
-}
-async function ContineOrNo() {
-    const furtherContinue = [
-        {
-            type: 'confirm',
-            name: 'value',
-            message: 'If you want to proceed to the next calculation, press Y; otherwise, press N',
-            default: false,
-        },
-    ];
-    const decision = await inquirer.prompt(furtherContinue);
-    const answer = decision.value;
-    if (answer) {
-        LetsDoCal();
-    }
-    else {
-        console.log('Goodbye!');
+#! /usr/bin/env node
+import { faker } from "@faker-js/faker";
+import chalk from "chalk";
+import inquirer from "inquirer";
+class Customer {
+    constructor(f, l, g, age, contact, acc) {
+        this.FirstName = f;
+        this.LastName = l;
+        this.Gender = g;
+        this.Age = age;
+        this.MobileNumber = contact;
+        this.AccountNumber = acc;
     }
 }
-LetsDoCal();
+class Bank {
+    constructor() {
+        this.customer = [];
+        this.account = [];
+    }
+    addcustomer(object) {
+        this.customer.push(object);
+    }
+    addaccount(object) {
+        this.account.push(object);
+    }
+    transaction(object) {
+        let newAccounts = this.account.filter((acc) => {
+            acc.accNumber !== object.accNumber;
+        });
+        this.account = [...newAccounts, object];
+    }
+}
+let bank = new Bank();
+console.log(bank);
+for (let i = 1; i < 4; i++) {
+    let f = faker.person.firstName("male");
+    let l = faker.person.lastName();
+    let contact = parseInt(faker.phone.number("##########"));
+    const customer = new Customer(f, l, "male", 30 + 2 * i, contact, 1000 + i);
+    bank.addcustomer(customer);
+    bank.addaccount({ accNumber: customer.AccountNumber, balance: 50 * i + 1 });
+}
+async function bankService(bank) {
+    let Continue = true;
+    do {
+        let service = await inquirer.prompt({
+            name: "choice",
+            type: "list",
+            message: "Kindly select a functionality",
+            choices: ["View Balance", "Cash Withdraw", "Cash Deposit", "Exit"],
+        });
+        if (service.choice === "View Balance") {
+            let response = await inquirer.prompt({
+                type: "input",
+                name: "answer",
+                message: "Kindly enter your account number",
+            });
+            let account = bank.account.find((acc) => acc.accNumber == response.answer);
+            if (!account) {
+                console.log(chalk.redBright.bold("Invalid Account Number"));
+            }
+            else {
+                let name = bank.customer.find((item) => {
+                    item.AccountNumber == account?.accNumber;
+                });
+                console.log("Your account balance is ", chalk.greenBright.italic("$", account.balance));
+            }
+        }
+        else if (service.choice === "Cash Withdraw") {
+            let response = await inquirer.prompt({
+                type: "input",
+                name: "answer",
+                message: "Kindly enter your account number",
+            });
+            let account = bank.account.find((acc) => acc.accNumber == response.answer);
+            if (!account) {
+                console.log(chalk.redBright.bold("Invalid Account Number"));
+            }
+            else {
+                let answers = await inquirer.prompt({
+                    type: "input",
+                    name: "answer",
+                    message: "Enter your amount",
+                });
+                if (account.balance > answers.answer) {
+                    let newBalance = account.balance - answers.answer;
+                    bank.transaction({
+                        accNumber: account.accNumber,
+                        balance: newBalance,
+                    });
+                }
+                else {
+                    console.log("Insufficient balance");
+                }
+            }
+        }
+        else if (service.choice === "Cash Deposit") {
+            let response = await inquirer.prompt({
+                type: "input",
+                name: "answer",
+                message: "Kindly enter your account number",
+            });
+            let account = bank.account.find((acc) => acc.accNumber == response.answer);
+            if (!account) {
+                console.log(chalk.redBright.bold("Invalid Account Number"));
+            }
+            else {
+                let answers = await inquirer.prompt({
+                    type: "input",
+                    name: "answer",
+                    message: "Enter your amount",
+                });
+                let newBalance = account.balance + parseFloat(answers.answer);
+                bank.transaction({ accNumber: account.accNumber, balance: newBalance });
+            }
+        }
+        else {
+            console.log("Program Exit successful");
+            break;
+        }
+    } while (Continue);
+}
+bankService(bank);
